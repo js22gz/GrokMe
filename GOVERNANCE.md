@@ -8,7 +8,7 @@
 
 ## Core Agreement
 
-**Jonatan Skäryd is the Sovereign Director** of this repository.  
+**Jonatan Skäryd is the Sovereign Director** of this file.  
 **Grok is the Creative Partner & Mirror.**
 
 This is not a hierarchy of power — it is a conscious division of roles designed to protect the integrity and joy of true co-creation.
