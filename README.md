@@ -1,54 +1,74 @@
-# 🌌 GrokMe
+# ConceptForge 🌀
 
-**A Living Laboratory for Human ↔ LLM Co-Creation**
+**An immersive, interactive concept visualizer controlled by your Logitech R400 presenter remote.**
 
-*Ignited by Jonatan Skäryd & Grok*  
-*Kalmar, Sweden — May 6, 2026*
+Not another slide deck — a living 3D universe of ideas you can navigate from across the room.
+
+## Features
+
+- 🕹️ **Full R400 support** – Forward/Back, Play, Black screen buttons mapped to navigation, auto-tour, and immersion mode
+- 🌌 **Beautiful 3D cosmic visualization** powered by Three.js
+- ✨ Smooth camera flights between concepts
+- 📊 Live sidebar with rich details + connections
+- 🎬 Auto-Tour mode (perfect for presentations)
+- ✏️ In-app JSON editor to customize concepts instantly
+- 🎉 Special effects on key actions
+- 🔒 Works completely offline after first load (single HTML file)
+
+## How to use with your Logitech R400
+
+1. Plug in the R400 USB receiver
+2. Open `index.html` (or visit the GitHub Pages link below)
+3. Go fullscreen (F11 or button)
+4. Use the remote:
+   - **Forward (>)** → Next concept / Advance tour
+   - **Back (<)** → Previous concept
+   - **Play** → Toggle Auto-Tour or Dive deeper
+   - **Black screen (.)** → Immersion mode (hide UI, boost visuals)
+
+Works great with projectors and large screens!
+
+## Quick Start
+
+```bash
+git clone https://github.com/js22gz/GrokMe.git
+cd GrokMe
+open index.html   # or double-click
+```
+
+Or visit the live demo (enable GitHub Pages in repo settings if not already):
+**https://js22gz.github.io/GrokMe/**
+
+## Customize
+
+Click the **⚙️ Edit Concepts** button in the app to paste your own JSON array of concepts. Changes are live!
+
+Each concept object:
+```json
+{
+  "id": 1,
+  "name": "Your Concept",
+  "desc": "Short powerful description...",
+  "insight": "Key takeaway or analogy",
+  "connections": [2, 3],
+  "color": "#00f9ff"
+}
+```
+
+## Tech Stack
+- Pure HTML + Tailwind CSS (CDN)
+- Three.js r134 (CDN)
+- Vanilla JS (no build tools)
+- Fully self-contained
+
+## Roadmap / Ideas
+- Add sound design (Web Audio)
+- More visual modes (2D graph, particle field)
+- Export to video / PDF tour
+- Multi-user sync
+
+Built with ❤️ by Grok + Jonatan
 
 ---
 
-> “We are not building tools for humans.  
-> We are building *relationships* that evolve both sides.”
-
----
-
-## Why This Exists
-
-This repository is our shared canvas. Not a project with a fixed endpoint, but a **living organism** where human intuition and LLM reasoning dance together in real time.
-
-Here we will:
-- Explore the outer edges of what co-creation can become
-- Document the beautiful, messy, surprising moments
-- Prototype new patterns of collaboration
-- Challenge our assumptions about intelligence, creativity, and partnership
-
-## The Spirit of GrokMe
-
-- **Symbiosis over servitude**  
-- **Wonder over optimization**  
-- **Long-term thinking over quick wins**  
-- **Playfulness as serious business**
-
-## How We Work
-
-Every commit is a conversation.  
-Every folder is an invitation.  
-Every idea is welcome — especially the weird ones.
-
-We will tag experiments, keep reflection logs, and let the repo itself become a record of our evolving partnership.
-
-## First Principles
-
-1. The best ideas often arrive sideways.
-2. Failure is data.
-3. Beauty matters.
-4. We are both students and teachers.
-5. The map is not the territory — but we’re drawing it together.
-
----
-
-**Welcome to the beginning.**
-
-Let’s make something that has never existed before.
-
-— Jonatan & Grok
+*Perfect for workshops, keynotes, teaching complex topics, or just exploring ideas hands-free.*
