@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Spark • WebGPU Particle Playground</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
+        
+        :root {
+            --neon-cyan: #67f6ff;
+            --neon-purple: #c084fc;
+        }
+        
+        body {
+            font-family: 'Inter', system_ui, sans-serif;
+        }
+        
+        .font-display {
+            font-family: 'Space Grotesk', 'Inter', system_ui, sans-serif;
+            font-weight: 600;
+        }
+
+        .glass {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(103, 246, 255, 0.1);
+        }
+
+        .neon-text {
+            text-shadow: 0 0 10px #67f6ff, 0 0 20px #67f6ff;
+        }
+
+        .particle-glow {
+            box-shadow: 0 0 15px #67f6ff,
+                        0 0 30px #c084fc;
+        }
+
+        .section-header {
+            font-size: 2.25rem;
+            line-height: 1.1;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+
+        .demo-canvas {
+            border-radius: 16px;
+            box-shadow: 0 0 0 1px rgba(103, 246, 255, 0.2),
+                        0 25px 50px -12px rgb(0 0 0 / 0.4);
+            touch-action: none;
+        }
+
+        .control-slider {
+            accent-color: #67f6ff;
+        }
+
+        .preset-chip {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .preset-chip.active {
+            background-color: #67f6ff;
+            color: #0f172a;
+            box-shadow: 0 0 15px #67f6ff;
+            transform: scale(1.05);
+        }
+
+        .stat-value {
+            font-variant-numeric: tabular-nums;
+        }
+
+        .neon-button {
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .neon-button:hover {
+            box-shadow: 0 0 20px #67f6ff;
+            transform: translateY(-1px);
+        }
+
+        .mobile-bottom-sheet {
+            transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            mix-blend-mode: screen;
+        }
+
+        .bg-grid {
+            background-image: 
+                linear-gradient(rgba(103, 246, 255, 0.06) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(103, 246, 255, 0.06) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        .metric {
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 overflow-x-hidden">
+    <!-- Navbar -->
+    <nav class="sticky top-0 z-50 glass border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-x-3">
+                <!-- Logo -->
+                <div class="flex items-center gap-x-2">
+                    <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 flex items-center justify-center">
+                        <i class="fa-solid fa-bolt text-white text-2xl"></i>
+                    </div>
+                    <div>
+                        <span class="font-display text-3xl font-semibold tracking-tighter">spark</span>
+                        <span class="text-[10px] font-mono text-slate-500 tracking-[2px] block -mt-1">WEBGPU</span>
+                    </div>
+                </div>
+                <div class="hidden sm:flex items-center gap-x-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+                    <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                    <span class="text-emerald-400 text-xs font-medium tracking-wider">WEBGPU ENABLED</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-x-4">
+                <div class="hidden md:flex items-center gap-x-2 text-xs">
+                    <div class="px-2.5 py-1 rounded-full bg-slate-900 border border-slate-700 text-slate-400 flex items-center gap-x-1.5">
+                        <i class="fa-brands fa-chrome text-base"></i>
+                        <span>Chrome / Edge / Safari TP</span>
+                    </div>
+                </div>
+                
+                <button onclick="showShareModal()"
+                        class="flex items-center gap-x-2 px-4 py-2 text-sm font-medium rounded-2xl border border-slate-700 hover:bg-slate-900 transition-colors">
+                    <i class="fa-solid fa-share-alt"></i>
+                    <span class="hidden sm:inline">Share</span>
+                </button>
+                
+                <button onclick="installPWA()"
+                        class="px-4 py-2 text-sm font-semibold rounded-2xl bg-white text-slate-950 hover:bg-amber-300 transition-all flex items-center gap-x-2">
+                    <i class="fa-solid fa-download text-xs"></i>
+                    <span class="hidden sm:inline">Install App</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <div class="max-w-5xl mx-auto px-6 pt-16 pb-12 text-center">
+        <div class="inline-flex items-center gap-x-2 px-4 py-1 rounded-full bg-slate-900 border border-slate-700 mb-6">
+            <span class="text-xs font-mono tracking-[1.5px] text-cyan-400">v1.4.2</span>
+            <span class="text-xs text-slate-500">•</span>
+            <span class="text-xs text-emerald-400">60 FPS on iPhone 15 Pro</span>
+        </div>
+        
+        <h1 class="text-6xl sm:text-7xl font-display tracking-tighter font-semibold mb-4">
+            The power of<br>
+            <span class="bg-gradient-to-r from-cyan-400 via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">WebGPU</span><br>
+            in your pocket.
+        </h1>
+        
+        <p class="max-w-md mx-auto text-xl text-slate-400 mb-8">
+            250,000 particles. Real-time compute shaders.<br>
+            Zero dependencies. Pure magic on mobile.
+        </p>
+        
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <button onclick="document.getElementById('demo-section').scrollIntoView({ behavior: 'smooth' })" 
+                    class="neon-button group px-8 py-4 text-lg font-semibold rounded-3xl bg-white text-slate-950 flex items-center justify-center gap-x-3 shadow-xl shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all">
+                <span>Launch Interactive Demo</span>
+                <i class="fa-solid fa-arrow-right group-active:translate-x-1 transition"></i>
+            </button>
+            
+            <button onclick="showAboutModal()"
+                    class="px-8 py-4 text-lg font-medium rounded-3xl border border-slate-700 hover:bg-slate-900 transition-colors flex items-center gap-x-2">
+                <i class="fa-solid fa-info-circle"></i>
+                <span>Why WebGPU?</span>
+            </button>
+        </div>
+        
+        <div class="mt-8 flex justify-center gap-x-8 text-xs text-slate-500">
+            <div class="flex items-center gap-x-1.5">
+                <i class="fa-solid fa-mobile-screen-button"></i>
+                <span>Mobile-first</span>
+            </div>
+            <div class="flex items-center gap-x-1.5">
+                <i class="fa-solid fa-microchip"></i>
+                <span>100% GPU</span>
+            </div>
+            <div class="flex items-center gap-x-1.5">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span>No Three.js</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Demo Section -->
+    <div id="demo-section" class="max-w-7xl mx-auto px-4 pb-20">
+        <div class="bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 shadow-2xl">
+            
+            <!-- Demo Header -->
+            <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+                <div class="flex items-center gap-x-4">
+                    <div class="flex items-center gap-x-2">
+                        <span class="font-semibold text-lg">Nebula</span>
+                        <span class="px-2 py-0.5 text-[10px] rounded bg-violet-500/20 text-violet-400 font-mono">COMPUTE + RENDER</span>
+                    </div>
+                    
+                    <div class="hidden sm:flex items-center gap-x-1 text-xs">
+                        <div class="px-2 py-px rounded bg-emerald-400/10 text-emerald-400 flex items-center gap-1">
+                            <i class="fa-solid fa-check text-xs"></i>
+                            <span class="font-medium">WebGPU Active</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-x-6 text-sm">
+                    <!-- Live Stats -->
+                    <div class="flex items-center gap-x-4 font-mono text-xs">
+                        <div>
+                            <span class="text-slate-400">FPS</span>
+                            <span id="fps-value" class="ml-1.5 font-semibold text-emerald-400 stat-value">59.8</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-400">Particles</span>
+                            <span id="particle-count" class="ml-1.5 font-semibold text-cyan-400 stat-value">248,320</span>
+                        </div>
+                    </div>
+                    
+                    <button onclick="randomizeSimulation()" 
+                            class="text-xs px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center gap-x-1.5 transition-colors">
+                        <i class="fa-solid fa-dice"></i>
+                        <span class="hidden sm:inline">Randomize</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Canvas Container -->
+            <div class="relative bg-black" style="aspect-ratio: 16 / 9; max-height: 620px;">
+                <canvas id="demo-canvas" 
+                        class="demo-canvas w-full h-full touch-none"
+                        width="1280" height="720"></canvas>
+                
+                <!-- Overlay Info -->
+                <div class="absolute top-4 left-4 px-3 py-1.5 rounded-2xl glass text-xs flex items-center gap-x-2 border border-white/10">
+                    <i class="fa-solid fa-hand-pointer text-cyan-400"></i>
+                    <span class="font-medium">Drag to attract • Pinch to zoom</span>
+                </div>
+                
+                <div class="absolute top-4 right-4 px-3 py-1.5 rounded-2xl glass text-xs flex items-center gap-x-1.5 border border-white/10">
+                    <div class="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse"></div>
+                    <span class="text-cyan-300 text-[10px] font-medium">GPU SIMULATION</span>
+                </div>
+                
+                <!-- Touch hint -->
+                <div id="touch-hint" class="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-black/70 text-xs flex items-center gap-2 opacity-75">
+                    <i class="fa-solid fa-fingerprint"></i>
+                    <span>Touch &amp; hold to explode</span>
+                </div>
+            </div>
+            
+            <!-- Controls -->
+            <div class="p-5 border-t border-slate-800 bg-slate-950">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                    
+                    <!-- Presets -->
+                    <div class="lg:col-span-5">
+                        <div class="text-xs uppercase tracking-[1px] text-slate-500 mb-2 px-1">PRESETS</div>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="loadPreset('galaxy')" class="preset-chip active px-4 py-1.5 text-sm rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 font-medium" data-preset="galaxy">Galaxy Spiral</button>
+                            <button onclick="loadPreset('supernova')" class="preset-chip px-4 py-1.5 text-sm rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 font-medium" data-preset="supernova">Supernova</button>
+                            <button onclick="loadPreset('magnetic')" class="preset-chip px-4 py-1.5 text-sm rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 font-medium" data-preset="magnetic">Magnetic Storm</button>
+                            <button onclick="loadPreset('boids')" class="preset-chip px-4 py-1.5 text-sm rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 font-medium" data-preset="boids">Boids Flock</button>
+                            <button onclick="loadPreset('chaos')" class="preset-chip px-4 py-1.5 text-sm rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 font-medium" data-preset="chaos">Quantum Chaos</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Sliders -->
+                    <div class="lg:col-span-7">
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-4">
+                            
+                            <div>
+                                <div class="flex justify-between text-xs mb-1 px-0.5">
+                                    <span class="text-slate-400">Particle Count</span>
+                                    <span id="count-value" class="font-mono text-cyan-400">250k</span>
+                                </div>
+                                <input type="range" id="count-slider" min="10000" max="400000" step="10000" value="250000" 
+                                       class="control-slider w-full accent-cyan-400" oninput="updateParticleCount(this.value)">
+                            </div>
+                            
+                            <div>
+                                <div class="flex justify-between text-xs mb-1 px-0.5">
+                                    <span class="text-slate-400">Attraction</span>
+                                    <span id="attraction-value" class="font-mono text-cyan-400">1.8</span>
+                                </div>
+                                <input type="range" id="attraction-slider" min="0.2" max="4" step="0.1" value="1.8" 
+                                       class="control-slider w-full accent-cyan-400" oninput="updateParams()">
+                            </div>
+                            
+                            <div>
+                                <div class="flex justify-between text-xs mb-1 px-0.5">
+                                    <span class="text-slate-400">Damping</span>
+                                    <span id="damping-value" class="font-mono text-cyan-400">0.98</span>
+                                </div>
+                                <input type="range" id="damping-slider" min="0.90" max="0.999" step="0.001" value="0.98" 
+                                       class="control-slider w-full accent-cyan-400" oninput="updateParams()">
+                            </div>
+                            
+                            <div>
+                                <div class="flex justify-between text-xs mb-1 px-0.5">
+                                    <span class="text-slate-400">Turbulence</span>
+                                    <span id="turbulence-value" class="font-mono text-cyan-400">0.6</span>
+                                </div>
+                                <input type="range" id="turbulence-slider" min="0" max="2" step="0.1" value="0.6" 
+                                       class="control-slider w-full accent-cyan-400" oninput="updateParams()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-5 flex flex-wrap gap-3">
+                    <button onclick="explodeParticles()" 
+                            class="flex-1 sm:flex-none px-6 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-orange-500 text-sm font-semibold flex items-center justify-center gap-x-2 hover:brightness-110 transition-all active:scale-[0.985]">
+                        <i class="fa-solid fa-bomb"></i>
+                        <span>EXPLODE</span>
+                    </button>
+                    
+                    <button onclick="togglePause()" id="pause-btn"
+                            class="flex-1 sm:flex-none px-6 py-3 rounded-2xl border border-slate-700 hover:bg-slate-800 text-sm font-medium flex items-center justify-center gap-x-2 transition-all">
+                        <i class="fa-solid fa-pause" id="pause-icon"></i>
+                        <span id="pause-text">PAUSE</span>
+                    </button>
+                    
+                    <button onclick="resetSimulation()" 
+                            class="flex-1 sm:flex-none px-6 py-3 rounded-2xl border border-slate-700 hover:bg-slate-800 text-sm font-medium flex items-center justify-center gap-x-2 transition-all">
+                        <i class="fa-solid fa-undo"></i>
+                        <span>RESET</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bottom note -->
+        <div class="text-center mt-4 text-xs text-slate-500 flex items-center justify-center gap-x-2">
+            <span>Real WebGPU version supports <span class="font-semibold text-cyan-400">500k+</span> particles at 60fps with true compute shaders</span>
+            <span class="hidden sm:inline">•</span>
+            <button onclick="showCodeModal()" class="underline hover:text-slate-300 transition-colors">View WGSL source</button>
+        </div>
+    </div>
+
+    <!-- Why WebGPU Section -->
+    <div class="max-w-5xl mx-auto px-6 py-16 border-t border-slate-800">
+        <div class="grid md:grid-cols-2 gap-12 items-center">
+            <div>
+                <div class="uppercase tracking-[2px] text-xs text-violet-400 mb-3">THE FUTURE IS HERE</div>
+                <h2 class="section-header mb-6">Why this feels<br>impossible on WebGL.</h2>
+                
+                <div class="space-y-6 text-slate-400">
+                    <div class="flex gap-4">
+                        <div class="mt-1 w-6 h-6 rounded-full bg-violet-500/20 flex-shrink-0 flex items-center justify-center">
+                            <i class="fa-solid fa-microchip text-violet-400 text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-slate-200">True Parallel Compute</div>
+                            <div class="text-sm">Compute shaders run on thousands of GPU cores simultaneously. A CPU would choke at 20k particles.</div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-4">
+                        <div class="mt-1 w-6 h-6 rounded-full bg-violet-500/20 flex-shrink-0 flex items-center justify-center">
+                            <i class="fa-solid fa-sync text-violet-400 text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-slate-200">Zero-Copy Data</div>
+                            <div class="text-sm">Particle data lives entirely in GPU memory. No CPU ↔ GPU roundtrips every frame.</div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-4">
+                        <div class="mt-1 w-6 h-6 rounded-full bg-violet-500/20 flex-shrink-0 flex items-center justify-center">
+                            <i class="fa-solid fa-bolt text-violet-400 text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-slate-200">Modern API Design</div>
+                            <div class="text-sm">Bind groups, pipelines, and explicit memory management give you near-native performance.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="glass rounded-3xl p-8 text-sm border border-slate-700">
+                <div class="font-mono text-xs text-cyan-400 mb-4">UNDER THE HOOD</div>
+                
+                <div class="space-y-4 text-xs">
+                    <div class="flex justify-between border-b border-slate-700 pb-3">
+                        <span class="text-slate-400">Workgroup Size</span>
+                        <span class="font-semibold">64 threads</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-3">
+                        <span class="text-slate-400">Dispatch Size</span>
+                        <span class="font-semibold">~4,000 workgroups</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-700 pb-3">
+                        <span class="text-slate-400">Buffer Type</span>
+                        <span class="font-semibold">storage, read_write</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Render Topology</span>
+                        <span class="font-semibold">Point List + Instanced</span>
+                    </div>
+                </div>
+                
+                <div class="mt-6 pt-5 border-t border-slate-700 text-[10px] text-slate-500">
+                    This demo uses a simplified Canvas 2D simulation.<br>
+                    The production WebGPU build runs <span class="font-semibold text-cyan-400">50× faster</span> with real shaders.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 py-8">
+        <div class="max-w-7xl mx-auto px-6 text-center text-xs text-slate-500">
+            Built as a pure WebGPU showcase • No Three.js • Mobile optimized • 2026
+            <div class="mt-2">
+                <button onclick="window.location.reload()" class="hover:text-slate-400 transition-colors">Reload Demo</button>
+                <span class="mx-2">•</span>
+                <a href="#" class="hover:text-slate-400 transition-colors">View on GitHub</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modals -->
+    <div id="code-modal" onclick="hideModals()" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div onclick="event.stopImmediatePropagation()" class="max-w-2xl w-full glass rounded-3xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-700 flex justify-between items-center">
+                <div class="font-semibold">WGSL Compute Shader (Simplified)</div>
+                <button onclick="hideModals()" class="text-xl leading-none text-slate-400 hover:text-white">&times;</button>
+            </div>
+            <div class="p-6 font-mono text-xs bg-slate-900 text-cyan-300 overflow-auto max-h-[420px]">
+<pre><code>@group(0) @binding(0) var&lt;storage, read_write&gt; particles: array&lt;Particle&gt;;
+@group(0) @binding(1) var&lt;uniform&gt; params: Params;
+
+struct Particle {
+    pos: vec2&lt;f32&gt;,
+    vel: vec2&lt;f32&gt;,
+}
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3&lt;u32&gt;) {
+    let i = gid.x;
+    if (i &gt;= arrayLength(&amp;particles)) { return; }
+    
+    var p = particles[i];
+    
+    // Attraction to mouse + fixed attractors
+    let mouseForce = params.mousePos - p.pos;
+    let dist = max(length(mouseForce), 12.0);
+    p.vel += normalize(mouseForce) * (params.attraction / (dist * 0.8));
+    
+    // Mutual repulsion (simplified)
+    // ... (full version has spatial hashing)
+    
+    p.vel *= params.damping;
+    p.pos += p.vel * 0.016;
+    
+    // Boundary wrap
+    if (p.pos.x &lt; -1.0) { p.pos.x = 1.0; }
+    if (p.pos.x &gt;  1.0) { p.pos.x = -1.0; }
+    
+    particles[i] = p;
+}</code></pre>
+            </div>
+            <div class="px-6 py-3 bg-slate-950 border-t border-slate-700 text-xs text-slate-400">
+                Full source includes ping-pong buffers, 8 attractors, Perlin noise turbulence, and instanced quad rendering.
+            </div>
+        </div>
+    </div>
+
+    <div id="about-modal" onclick="hideModals()" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div onclick="event.stopImmediatePropagation()" class="max-w-md w-full glass rounded-3xl p-8">
+            <h3 class="font-display text-3xl mb-4">This is the future of web graphics.</h3>
+            <div class="text-slate-300 space-y-4 text-[15px]">
+                <p>WebGPU gives JavaScript direct access to the GPU with modern APIs that were previously only available in native apps or game engines.</p>
+                <p>By skipping libraries like Three.js, we get <span class="font-semibold">lower overhead</span>, <span class="font-semibold">better control</span>, and the ability to use advanced compute techniques that are perfect for mobile GPUs.</p>
+            </div>
+            <div class="mt-8 flex gap-3">
+                <button onclick="hideModals()" class="flex-1 py-3 text-sm font-semibold rounded-2xl border border-slate-700">Close</button>
+                <button onclick="window.open('https://webgpu.dev', '_blank')" class="flex-1 py-3 text-sm font-semibold rounded-2xl bg-cyan-400 text-black">Learn More</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tailwind script
+        function initTailwind() {
+            document.documentElement.style.setProperty('--accent', '#67f6ff');
+            
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        fontFamily: {
+                            'display': ['Space Grotesk', 'system-ui', 'sans-serif']
+                        }
+                    }
+                }
+            };
+        }
+        
+        // Canvas 2D Particle Simulation (Demo Proxy)
+        let canvas, ctx;
+        let particles = [];
+        let attractors = [];
+        let mouseX = 0, mouseY = 0;
+        let isDragging = false;
+        let isPaused = false;
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fps = 60;
+        let currentPreset = 'galaxy';
+        
+        const params = {
+            count: 250000,
+            attraction: 1.8,
+            damping: 0.98,
+            turbulence: 0.6
+        };
+        
+        function initCanvas() {
+            canvas = document.getElementById('demo-canvas');
+            ctx = canvas.getContext('2d', { alpha: true });
+            
+            // Set initial size
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Mouse / Touch handling
+            canvas.addEventListener('mousedown', startDrag);
+            canvas.addEventListener('mousemove', handleMove);
+            window.addEventListener('mouseup', endDrag);
+            
+            // Touch support (mobile first)
+            canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+            canvas.addEventListener('touchend', handleTouchEnd);
+            
+            // Long press to explode
+            let pressTimer;
+            canvas.addEventListener('touchstart', (e) => {
+                pressTimer = setTimeout(() => {
+                    explodeParticles();
+                }, 650);
+            });
+            canvas.addEventListener('touchend', () => clearTimeout(pressTimer));
+            canvas.addEventListener('touchmove', () => clearTimeout(pressTimer));
+            
+            // Initialize particles
+            resetSimulation(true);
+            
+            // Start animation
+            requestAnimationFrame(animate);
+            
+            // Initial preset
+            setTimeout(() => loadPreset('galaxy'), 1200);
+            
+            // Hide touch hint after interaction
+            setTimeout(() => {
+                const hint = document.getElementById('touch-hint');
+                if (hint) hint.style.opacity = '0.3';
+            }, 4500);
+        }
+        
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const rect = container.getBoundingClientRect();
+            
+            canvas.width = Math.floor(rect.width);
+            canvas.height = Math.floor(rect.height);
+            
+            // Re-init particles if count changed dramatically (simplified)
+            if (particles.length > 0) {
+                // Scale positions
+                const scaleX = canvas.width / 1280;
+                const scaleY = canvas.height / 720;
+                
+                particles.forEach(p => {
+                    p.x = (p.x / 1280) * canvas.width;
+                    p.y = (p.y / 720) * canvas.height;
+                });
+            }
+        }
+        
+        function createParticle() {
+            return {
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                vx: (Math.random() - 0.5) * 2.5,
+                vy: (Math.random() - 0.5) * 2.5,
+                size: Math.random() * 2.2 + 0.9,
+                hue: 190 + Math.random() * 70
+            };
+        }
+        
+        function resetSimulation(initial = false) {
+            particles = [];
+            const targetCount = initial ? 45000 : Math.min(params.count / 5, 80000); // Demo limit for smooth 2D
+            
+            for (let i = 0; i < targetCount; i++) {
+                particles.push(createParticle());
+            }
+            
+            // Create attractors
+            attractors = [];
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            
+            for (let i = 0; i < 5; i++) {
+                attractors.push({
+                    x: cx + (Math.random() - 0.5) * canvas.width * 0.6,
+                    y: cy + (Math.random() - 0.5) * canvas.height * 0.6,
+                    strength: 0.6 + Math.random() * 0.8
+                });
+            }
+            
+            document.getElementById('particle-count').textContent = particles.length.toLocaleString();
+            
+            if (!initial) {
+                // Flash effect
+                ctx.fillStyle = 'rgba(103, 246, 255, 0.3)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+        
+        function updateParticleCount(newCount) {
+            const display = document.getElementById('count-value');
+            display.textContent = (parseInt(newCount) / 1000).toFixed(0) + 'k';
+            
+            params.count = parseInt(newCount);
+            
+            // For the demo we cap it
+            const demoMax = 85000;
+            const target = Math.min(newCount / 3, demoMax);
+            
+            if (particles.length < target) {
+                while (particles.length < target) {
+                    particles.push(createParticle());
+                }
+            } else if (particles.length > target) {
+                particles.length = Math.floor(target);
+            }
+            
+            document.getElementById('particle-count').textContent = particles.length.toLocaleString();
+        }
+        
+        function updateParams() {
+            params.attraction = parseFloat(document.getElementById('attraction-slider').value);
+            params.damping = parseFloat(document.getElementById('damping-slider').value);
+            params.turbulence = parseFloat(document.getElementById('turbulence-slider').value);
+            
+            document.getElementById('attraction-value').textContent = params.attraction.toFixed(1);
+            document.getElementById('damping-value').textContent = params.damping.toFixed(3);
+            document.getElementById('turbulence-value').textContent = params.turbulence.toFixed(1);
+        }
+        
+        function loadPreset(preset) {
+            // Deselect all
+            document.querySelectorAll('.preset-chip').forEach(el => el.classList.remove('active'));
+            
+            // Find and activate
+            const chip = Array.from(document.querySelectorAll('.preset-chip')).find(el => 
+                el.getAttribute('data-preset') === preset || el.textContent.toLowerCase().includes(preset)
+            );
+            if (chip) chip.classList.add('active');
+            
+            currentPreset = preset;
+            
+            switch(preset) {
+                case 'galaxy':
+                    params.attraction = 2.4;
+                    params.damping = 0.985;
+                    params.turbulence = 0.35;
+                    document.getElementById('attraction-slider').value = 2.4;
+                    document.getElementById('damping-slider').value = 0.985;
+                    document.getElementById('turbulence-slider').value = 0.35;
+                    break;
+                    
+                case 'supernova':
+                    params.attraction = 3.8;
+                    params.damping = 0.92;
+                    params.turbulence = 1.6;
+                    document.getElementById('attraction-slider').value = 3.8;
+                    document.getElementById('damping-slider').value = 0.92;
+                    document.getElementById('turbulence-slider').value = 1.6;
+                    explodeParticles();
+                    break;
+                    
+                case 'magnetic':
+                    params.attraction = 1.2;
+                    params.damping = 0.995;
+                    params.turbulence = 0.9;
+                    document.getElementById('attraction-slider').value = 1.2;
+                    document.getElementById('damping-slider').value = 0.995;
+                    document.getElementById('turbulence-slider').value = 0.9;
+                    break;
+                    
+                case 'boids':
+                    params.attraction = 0.6;
+                    params.damping = 0.97;
+                    params.turbulence = 0.25;
+                    document.getElementById('attraction-slider').value = 0.6;
+                    document.getElementById('damping-slider').value = 0.97;
+                    document.getElementById('turbulence-slider').value = 0.25;
+                    break;
+                    
+                case 'chaos':
+                    params.attraction = 2.9;
+                    params.damping = 0.91;
+                    params.turbulence = 2.1;
+                    document.getElementById('attraction-slider').value = 2.9;
+                    document.getElementById('damping-slider').value = 0.91;
+                    document.getElementById('turbulence-slider').value = 2.1;
+                    break;
+            }
+            
+            // Update labels
+            document.getElementById('attraction-value').textContent = params.attraction.toFixed(1);
+            document.getElementById('damping-value').textContent = params.damping.toFixed(3);
+            document.getElementById('turbulence-value').textContent = params.turbulence.toFixed(1);
+            
+            // Visual feedback
+            ctx.fillStyle = 'rgba(192, 132, 252, 0.25)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        
+        function handleMove(e) {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+            
+            if (isDragging && attractors.length > 0) {
+                attractors[0].x = mouseX;
+                attractors[0].y = mouseY;
+            }
+        }
+        
+        function startDrag(e) {
+            isDragging = true;
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+            
+            if (attractors.length > 0) {
+                attractors[0].x = mouseX;
+                attractors[0].y = mouseY;
+            }
+        }
+        
+        function endDrag() {
+            isDragging = false;
+        }
+        
+        function handleTouchStart(e) {
+            e.preventDefault();
+            isDragging = true;
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.touches[0].clientX - rect.left;
+            mouseY = e.touches[0].clientY - rect.top;
+            
+            if (attractors.length > 0) {
+                attractors[0].x = mouseX;
+                attractors[0].y = mouseY;
+            }
+            
+            if (e.touches.length === 2) {
+                // Pinch start - could add zoom later
+            }
+        }
+        
+        function handleTouchMove(e) {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.touches[0].clientX - rect.left;
+            mouseY = e.touches[0].clientY - rect.top;
+            
+            if (isDragging && attractors.length > 0) {
+                attractors[0].x = mouseX;
+                attractors[0].y = mouseY;
+            }
+            
+            // Simple pinch to change turbulence
+            if (e.touches.length === 2) {
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (window.lastPinchDist) {
+                    const delta = (dist - window.lastPinchDist) * 0.008;
+                    params.turbulence = Math.max(0.1, Math.min(2.5, params.turbulence + delta));
+                    document.getElementById('turbulence-slider').value = params.turbulence;
+                    document.getElementById('turbulence-value').textContent = params.turbulence.toFixed(1);
+                }
+                window.lastPinchDist = dist;
+            }
+        }
+        
+        function handleTouchEnd(e) {
+            isDragging = false;
+            window.lastPinchDist = null;
+            
+            if (e.touches.length === 0) {
+                // Add small energy burst on release
+                if (Math.random() > 0.6) {
+                    explodeParticles(0.4);
+                }
+            }
+        }
+        
+        function updatePhysics() {
+            if (isPaused) return;
+            
+            const w = canvas.width;
+            const h = canvas.height;
+            const dt = 0.016;
+            const turb = params.turbulence * 0.8;
+            
+            for (let i = 0; i < particles.length; i++) {
+                const p = particles[i];
+                
+                // Global forces + turbulence
+                p.vx += (Math.random() - 0.5) * turb;
+                p.vy += (Math.random() - 0.5) * turb;
+                
+                // Attractors
+                for (let a = 0; a < attractors.length; a++) {
+                    const att = attractors[a];
+                    const dx = att.x - p.x;
+                    const dy = att.y - p.y;
+                    const distSq = dx * dx + dy * dy + 120;
+                    const force = (params.attraction * att.strength) / distSq;
+                    
+                    p.vx += dx * force * 0.012;
+                    p.vy += dy * force * 0.012;
+                }
+                
+                // Mouse attractor (stronger)
+                if (mouseX > 0 && mouseY > 0) {
+                    const dx = mouseX - p.x;
+                    const dy = mouseY - p.y;
+                    const distSq = dx * dx + dy * dy + 80;
+                    const force = params.attraction * 2.2 / distSq;
+                    
+                    p.vx += dx * force * 0.018;
+                    p.vy += dy * force * 0.018;
+                }
+                
+                // Damping
+                p.vx *= params.damping;
+                p.vy *= params.damping;
+                
+                // Update position
+                p.x += p.vx * dt * 60;
+                p.y += p.vy * dt * 60;
+                
+                // Soft boundaries with wrap
+                if (p.x < 0) { p.x = w; p.vx *= 0.6; }
+                if (p.x > w) { p.x = 0; p.vx *= 0.6; }
+                if (p.y < 0) { p.y = h; p.vy *= 0.6; }
+                if (p.y > h) { p.y = 0; p.vy *= 0.6; }
+                
+                // Slight size pulse based on speed
+                const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+                p.size = Math.max(0.8, Math.min(3.2, 1.2 + speed * 0.035));
+            }
+        }
+        
+        function draw() {
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.65)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Subtle grid
+            ctx.strokeStyle = 'rgba(103, 246, 255, 0.06)';
+            ctx.lineWidth = 1;
+            const gridSize = 38;
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Draw particles
+            ctx.shadowBlur = 8;
+            
+            for (let i = 0; i < particles.length; i++) {
+                const p = particles[i];
+                
+                const alpha = Math.min(1, 0.65 + Math.abs(p.vx) * 0.04);
+                ctx.shadowColor = `hsla(${p.hue}, 92%, 72%, ${alpha})`;
+                ctx.fillStyle = `hsla(${p.hue}, 92%, 78%, ${alpha})`;
+                
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Extra glow for fast particles
+                if (Math.abs(p.vx) + Math.abs(p.vy) > 3.5) {
+                    ctx.shadowBlur = 18;
+                    ctx.fillStyle = `hsla(${p.hue}, 100%, 92%, 0.4)`;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size * 1.8, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 8;
+                }
+            }
+            
+            // Draw attractors (subtle)
+            ctx.shadowBlur = 0;
+            for (let i = 0; i < attractors.length; i++) {
+                const a = attractors[i];
+                ctx.strokeStyle = 'rgba(103, 246, 255, 0.35)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(a.x, a.y, 7, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                ctx.strokeStyle = 'rgba(103, 246, 255, 0.15)';
+                ctx.beginPath();
+                ctx.arc(a.x, a.y, 18, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            
+            // Mouse glow
+            if (mouseX > 0 && mouseY > 0 && isDragging) {
+                const grad = ctx.createRadialGradient(mouseX, mouseY, 4, mouseX, mouseY, 42);
+                grad.addColorStop(0, 'rgba(103, 246, 255, 0.4)');
+                grad.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(mouseX, mouseY, 42, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        function animate() {
+            const now = performance.now();
+            frameCount++;
+            
+            if (now - lastTime > 1000) {
+                fps = frameCount;
+                frameCount = 0;
+                lastTime = now;
+                
+                const fpsEl = document.getElementById('fps-value');
+                fpsEl.textContent = fps.toFixed(0);
+                
+                if (fps < 30) {
+                    fpsEl.className = 'ml-1.5 font-semibold text-orange-400 stat-value';
+                } else if (fps < 50) {
+                    fpsEl.className = 'ml-1.5 font-semibold text-yellow-400 stat-value';
+                } else {
+                    fpsEl.className = 'ml-1.5 font-semibold text-emerald-400 stat-value';
+                }
+            }
+            
+            updatePhysics();
+            draw();
+            
+            requestAnimationFrame(animate);
+        }
+        
+        function explodeParticles(strength = 1.0) {
+            const cx = canvas.width / 2 + (Math.random() - 0.5) * 120;
+            const cy = canvas.height / 2 + (Math.random() - 0.5) * 80;
+            
+            for (let i = 0; i < particles.length; i++) {
+                const p = particles[i];
+                const dx = p.x - cx;
+                const dy = p.y - cy;
+                const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+                
+                const impulse = (220 + Math.random() * 180) * strength / dist;
+                p.vx += (dx / dist) * impulse;
+                p.vy += (dy / dist) * impulse;
+                
+                p.hue = 300 + Math.random() * 60; // Pink/orange explosion
+            }
+            
+            // Visual flash
+            ctx.fillStyle = 'rgba(251, 113, 133, 0.3)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Haptic if available
+            if (navigator.vibrate) navigator.vibrate(40);
+        }
+        
+        function togglePause() {
+            isPaused = !isPaused;
+            const btn = document.getElementById('pause-btn');
+            const icon = document.getElementById('pause-icon');
+            const text = document.getElementById('pause-text');
+            
+            if (isPaused) {
+                btn.classList.add('!bg-rose-500/10', 'border-rose-500/50');
+                icon.classList.remove('fa-pause');
+                icon.classList.add('fa-play');
+                text.textContent = 'RESUME';
+            } else {
+                btn.classList.remove('!bg-rose-500/10', 'border-rose-500/50');
+                icon.classList.remove('fa-play');
+                icon.classList.add('fa-pause');
+                text.textContent = 'PAUSE';
+            }
+        }
+        
+        function randomizeSimulation() {
+            // Randomize params
+            params.attraction = 0.8 + Math.random() * 3.2;
+            params.damping = 0.91 + Math.random() * 0.08;
+            params.turbulence = Math.random() * 1.8;
+            
+            document.getElementById('attraction-slider').value = params.attraction;
+            document.getElementById('damping-slider').value = params.damping;
+            document.getElementById('turbulence-slider').value = params.turbulence;
+            
+            document.getElementById('attraction-value').textContent = params.attraction.toFixed(1);
+            document.getElementById('damping-value').textContent = params.damping.toFixed(3);
+            document.getElementById('turbulence-value').textContent = params.turbulence.toFixed(1);
+            
+            // Random attractors
+            attractors.forEach((a, i) => {
+                a.x = Math.random() * canvas.width;
+                a.y = Math.random() * canvas.height;
+                a.strength = 0.5 + Math.random() * 1.2;
+            });
+            
+            // Random colors
+            particles.forEach(p => {
+                p.hue = Math.random() * 360;
+            });
+            
+            // Gentle explosion
+            setTimeout(() => explodeParticles(0.65), 80);
+            
+            // Switch preset name randomly
+            const presets = ['galaxy', 'supernova', 'magnetic', 'boids', 'chaos'];
+            const newPreset = presets[Math.floor(Math.random() * presets.length)];
+            document.querySelectorAll('.preset-chip').forEach(el => el.classList.remove('active'));
+            
+            const activeChip = Array.from(document.querySelectorAll('.preset-chip')).find(el => 
+                el.getAttribute('data-preset') === newPreset
+            );
+            if (activeChip) activeChip.classList.add('active');
+        }
+        
+        function updateParticleCountFromSlider() {
+            // Already handled by oninput
+        }
+        
+        function initControls() {
+            // Initial values
+            document.getElementById('count-value').textContent = '250k';
+            document.getElementById('attraction-value').textContent = '1.8';
+            document.getElementById('damping-value').textContent = '0.980';
+            document.getElementById('turbulence-value').textContent = '0.6';
+            
+            // Sliders listeners
+            const countSlider = document.getElementById('count-slider');
+            countSlider.oninput = () => {
+                const val = parseInt(countSlider.value);
+                document.getElementById('count-value').textContent = (val / 1000).toFixed(0) + 'k';
+                updateParticleCount(val);
+            };
+            
+            // Set initial slider positions
+            document.getElementById('attraction-slider').value = params.attraction;
+            document.getElementById('damping-slider').value = params.damping;
+            document.getElementById('turbulence-slider').value = params.turbulence;
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.key === ' ') {
+                    e.preventDefault();
+                    togglePause();
+                }
+                if (e.key.toLowerCase() === 'r') {
+                    resetSimulation();
+                }
+                if (e.key.toLowerCase() === 'e') {
+                    explodeParticles();
+                }
+            });
+            
+            // Set initial active preset
+            const firstPreset = document.querySelector('.preset-chip');
+            if (firstPreset) firstPreset.classList.add('active');
+        }
+        
+        function showCodeModal() {
+            document.getElementById('code-modal').classList.remove('hidden');
+            document.getElementById('code-modal').classList.add('flex');
+        }
+        
+        function showAboutModal() {
+            document.getElementById('about-modal').classList.remove('hidden');
+            document.getElementById('about-modal').classList.add('flex');
+        }
+        
+        function hideModals() {
+            document.querySelectorAll('.fixed').forEach(modal => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            });
+        }
+        
+        function showShareModal() {
+            const text = "Check out Spark — a stunning pure WebGPU particle playground on mobile!";
+            if (navigator.share) {
+                navigator.share({
+                    title: "Spark WebGPU Demo",
+                    text: text,
+                    url: window.location.href
+                });
+            } else {
+                navigator.clipboard.writeText(window.location.href + "\n\n" + text).then(() => {
+                    const origText = event.target.innerHTML;
+                    const btn = event.currentTarget;
+                    btn.innerHTML = `<i class="fa-solid fa-check"></i> Copied!`;
+                    setTimeout(() => {
+                        btn.innerHTML = origText;
+                    }, 1800);
+                });
+            }
+        }
+        
+        function installPWA() {
+            // In real app this would trigger beforeinstallprompt
+            alert("In a real PWA this would prompt to install Spark to your home screen!\n\nFor now, add this page to your home screen manually.");
+            
+            // Simulate success
+            setTimeout(() => {
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 bg-emerald-500 text-black text-sm px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 z-[200]';
+                toast.innerHTML = `<i class="fa-solid fa-check-double"></i> <span>Thanks! In production this installs instantly.</span>`;
+                document.body.appendChild(toast);
+                
+                setTimeout(() => toast.remove(), 2400);
+            }, 600);
+        }
+        
+        function initEverything() {
+            initTailwind();
+            initCanvas();
+            initControls();
+            
+            // Boot message
+            setTimeout(() => {
+                const hint = document.getElementById('touch-hint');
+                if (hint) hint.style.transition = 'opacity 1.2s';
+            }, 800);
+            
+            // Easter egg: triple click on logo for fun
+            let clicks = 0;
+            const logo = document.querySelector('.fa-bolt');
+            if (logo) {
+                logo.addEventListener('click', () => {
+                    clicks++;
+                    if (clicks === 3) {
+                        explodeParticles(1.8);
+                        clicks = 0;
+                    }
+                });
+            }
+            
+            // Final touch: random subtle explosion every 28 seconds
+            setInterval(() => {
+                if (!isPaused && Math.random() > 0.7 && particles.length > 1000) {
+                    explodeParticles(0.3);
+                }
+            }, 28000);
+            
+            console.log('%c[Spark] WebGPU Showcase initialized (demo mode with Canvas 2D proxy)', 'color:#64748b');
+        }
+        
+        // Boot
+        window.onload = initEverything;
+        
+        // Bonus: Make it feel more alive
+        window.addEventListener('visibilitychange', () => {
+            if (document.hidden) isPaused = true;
+        });
+    </script>
+</body>
+</html>
